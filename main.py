@@ -1,52 +1,83 @@
 from aiogram import Bot, types
-from aiogram.dispatcher import Dispatcher
+from aiogram.dispatcher import Dispatcher, FSMContext
 from aiogram.utils import executor
-import info, news, requests, vote
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher.filters.state import StatesGroup, State
+import config
 
-token = '5480170349:AAG_rSDagUJ53QFpBPveZIw5YR6GhsogdCg'
-
-bot = Bot(token=token)
-dp = Dispatcher(bot)
-
-"""@dp.message_handler(commands=['start'])
-async def process_start_command(message: types.Message):
-    await message.reply("Привет!\nНапиши мне что-нибудь!")
+storage = MemoryStorage()
+bot = Bot(token=config.BotToken)
+dp = Dispatcher(bot, storage=storage)
 
 
-@dp.message_handler(commands=['help'])
-async def process_help_command(message: types.Message):
-    await message.reply("Бот школы 334, который поможет узнать информацию о школе, оставить отзыв/предложение, узнать новости и принять участие в голосованиях. Но пока я эхо-бот!")
+class ClientStatesGroup(StatesGroup):
+    requests = State()
+    desc = State()
+    vote = State()
+    req = State()
+    comp = State()
 
 
-@dp.message_handler()
-async def echo_message(msg: types.Message):
-    await bot.send_message(msg.from_user.id, msg.text)
-"""
 @dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message):
-    await message.reply("Я бот школы 334, который поможет узнать информацию о школе, оставить отзыв/предложение, узнать новости и принять участие в голосованиях")
+    await message.reply(
+        "Я бот школы 334, который поможет узнать информацию о школе, оставить отзыв/предложение, узнать новости и принять участие в голосованиях")
+
+
 @dp.message_handler(commands=['info'])
 async def process_info_command(message: types.Message):
-    await message.reply("Школа 334...") #написать!
-@dp.message_handler(commands=['requests'])
+    await message.reply("Школа 334...")  # написать!
+
+
+@dp.message_handler(commands=['requests'], state=None)
 async def process_requests_command(message: types.Message):
     await message.reply("Вы хотите оставить жалобу или предложение?")
-    await message.answer("req - чтобы оставить предложение \ncomp - чтобы оставить жалобу")
-    @dp.message_handler(commands=['req'])
-    async def process_req_command(message: types.Message):
-        await message.answer("Напишите своё предложение")
-    @dp.message_handler(commands=['comp'])
-    async def process_comp_command(message: types.Message):
-        await message.answer("Напишите свою жалобу")
-        await message.answer("Вы хотите оставить жалобу или предложение?")
+    await message.answer("/req - чтобы оставить предложение \n/comp - чтобы оставить жалобу")
+    await ClientStatesGroup.requests.set()
+
+
+@dp.message_handler(commands=['req'], state=ClientStatesGroup.requests)
+async def process_req_command(message: types.Message):
+    await message.answer("Напишите своё предложение")
+    await ClientStatesGroup.req.set()
+
+
+@dp.message_handler(commands=['comp'], state=ClientStatesGroup.requests)
+async def process_comp_command(message: types.Message):
+    await message.answer("Напишите свою жалобу")
+    await ClientStatesGroup.comp.set()
+
+
+@dp.message_handler(state=ClientStatesGroup.req)
+async def process_req_command(message: types.Message, state: FSMContext):
+    await message.answer("Предложение сохранено!")
+    await state.finish()
+
+
+@dp.message_handler(state=ClientStatesGroup.comp)
+async def process_req_command(message: types.Message, state: FSMContext):
+    await message.answer("Жалоба сохранена!")
+    await state.finish()
+
+
 @dp.message_handler(commands=['voting'])
 async def process_voting_command(message: types.Message):
     await message.reply("Выберите в какои голосовании вы хотите учавствовать или начните своё!")
+
+
 @dp.message_handler(commands=['news'])
 async def process_news_command(message: types.Message):
     await message.reply("Список актуальных новостей:")
+
+
+@dp.message_handler(commands=['cancel'])
+async def cancel_state(message: types.Message, state: FSMContext):
+    cur_state = state.get_state()
+    await message.answer("otmena")
+    await state.finish()
+
+
 if __name__ == '__main__':
     executor.start_polling(dp)
 
-
-# функционал / ssh ключ
+# РАСКИДАТЬ ПО ФАЙЛИКАМ!!
